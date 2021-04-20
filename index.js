@@ -11,6 +11,7 @@ app.use(cors())
 
 
 const MongoClient = require('mongodb').MongoClient;
+const ObjectId = require('mongodb').ObjectId;
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.a3ov0.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -65,6 +66,13 @@ client.connect(err => {
         })
     })
 
+    app.get('/bookings/', (req,res) => {
+        bookingCollection.find({})
+        .toArray((err, documents) => {
+            res.send(documents);
+        })
+    })
+
     // app.get('/admins', (req,res) => {
     //     adminCollection.find({})
     //     .toArray((err, documents) => {
@@ -87,6 +95,26 @@ client.connect(err => {
             res.send(result.insertedCount > 0);
         })
     })
+
+    app.delete('/deleteService/:id', (req,res) => {
+        serviceCollection.deleteOne({
+            _id : ObjectId(req.params.id)
+        })
+        .then(result => {
+            res.send(result.deletedCount > 0);
+        })
+    })
+
+    app.patch('/modifyBookingStatus/:id', function (req, res) {
+        var status = req.body;
+        bookingCollection.updateOne({_id: ObjectId(req.params.id)},
+        {
+            $set: {"booking.status": status.status}
+        })
+        .then(result => {
+            res.send(result.modifiedCount > 0)
+        })
+    });
 });
 
 
