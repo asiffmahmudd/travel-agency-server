@@ -3,12 +3,28 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 const app = express()
 const port = 4000
+const admin = require('firebase-admin');
 require('dotenv').config()
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 app.use(cors())
 
+admin.initializeApp({
+    credential: admin.credential.cert({
+        "type": process.env.JWT_TYPE,
+        "project_id": process.env.PROJECT_ID,
+        "private_key_id": process.env.PRIVATE_KEY_ID,
+        "private_key": process.env.PRIVATE_KEY,
+        "client_email": process.env.CLIENT_EMAIL,
+        "client_id": process.env.CLIENT_ID,
+        "auth_uri": process.env.AUTH_URI,
+        "token_uri": process.env.TOKEN_URI,
+        "auth_provider_x509_cert_url": process.env.AUTH_PROVIDER_X509_CERT_URL,
+        "client_x509_cert_url": process.env.CLIENT_X509_CERT_URL
+    }),
+    databaseURL: process.env.DB_URL
+});
 
 const MongoClient = require('mongodb').MongoClient;
 const ObjectId = require('mongodb').ObjectId;
@@ -60,10 +76,32 @@ client.connect(err => {
     })
 
     app.get('/bookings/:email', (req,res) => {
-        bookingCollection.find({'booking.user.email': req.params.email})
-        .toArray((err, documents) => {
-            res.send(documents);
-        })
+        const bearer = req.headers.authorization;
+        if(bearer && bearer.startsWith('Bearer ')){
+            const idToken = bearer.split(' ')[1];
+            admin.auth().verifyIdToken(idToken)
+            .then((decodedToken) => {
+                const decodeEmail = decodedToken.email;
+                const reqEmail = req.params.email;
+                
+                if(decodeEmail === reqEmail){
+                    bookingCollection.find({'booking.user.email': req.params.email})
+                    .toArray((err, documents) => {
+                        res.send(documents);
+                    })
+                }
+                else{
+                    res.status(401).send("Unauthorized access")
+                }
+            })
+            .catch((error) => {
+                res.status(401).send("Unauthorized access")
+            });
+        }
+        else{
+            res.status(401).send("Unauthorized access")
+        }
+            
     })
 
     app.get('/bookings/', (req,res) => {
